@@ -1,5 +1,6 @@
 # =============================================================================#
-#                          MODEL DEFINITION FILE                              #
+#                          MODEL DEFINITION FILE (m10.py)                      #
+#            cable_delay + differential X/Y response (I->Q leakage)            #
 # =============================================================================#
 import bilby
 import numpy as np
@@ -17,13 +18,14 @@ C = c.value
 # -----------------------------------------------------------------------------#
 def model(pDict, lamSqArr_m2):
     """
-    Faraday thin source + differential X/Y phase (cable delay)
+    Faraday thin source + differential response between X,Y polarizations (i.e., I->Q leakage)
+
+    Was named "cable_delay+response" in the previous pipeline 
 
     Linear polarization:
         p * exp[ 2i (psi0 + RM lambda^2) ]
 
-    Instrumental leakage:
-        U <-> V rotation via differential phase between X/Y
+    I -> Q leakage here. The pDict has 'gain_diff'
 
     """
 
@@ -33,6 +35,9 @@ def model(pDict, lamSqArr_m2):
     # Fractional linear polarization
     pArr = pDict["fracPol"] * np.ones_like(lamSqArr_m2)
 
+    gain_X = 1.0 
+    gain_Y = gain_X * pDict['gain_diff']
+
     # Intrinsic Faraday rotation
     quArr = pArr * np.exp( 2j * (np.radians(pDict["psi0_deg"]) +
 			         pDict["RM_radm2"] * lamSqArr_m2)  )
@@ -40,7 +45,6 @@ def model(pDict, lamSqArr_m2):
     qArr = quArr.real
     uArr = quArr.imag
 
-    # No intrinsic circular polarization
     vArr = np.zeros_like(lamSqArr_m2)
 
     # Differential phase between X/Y feeds
@@ -52,6 +56,14 @@ def model(pDict, lamSqArr_m2):
     # Only Q and U are used in fractional system
     quArr = qArr + 1j * uArr
     vArr = -v_leak
+
+    # model the differential X,Y response (see Johnston 2006 for details)
+    qArr_leak = 0.5*np.ones_like(lamSqArr_m2)*(gain_X**2-gain_Y**2) + 0.5*qArr*(gain_X**2+gain_Y**2)
+    qArr = qArr_leak 
+    uArr = uArr*gain_X*gain_Y
+    vArr = vArr*gain_X*gain_Y 
+
+    quArr = qArr + 1j*uArr
 
     return quArr, vArr
 
@@ -84,6 +96,10 @@ prior_config = {
         name="lag_phi", latex_label=r"lag$_\phi$ (deg)",
         boundary="periodic",
     ),
+    "gain_diff": dict(
+        minimum=0.1, maximum=10.0,
+        name='gain_diff', latex_label=r"gain diff",
+    ),
 }
 
 def get_priors(bounds=None):
@@ -104,5 +120,3 @@ def get_priors(bounds=None):
     return priors 
 
 priors = get_priors()
-
-

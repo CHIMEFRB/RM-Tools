@@ -1,5 +1,6 @@
 # =============================================================================#
-#                          MODEL DEFINITION FILE                              #
+#                          MODEL DEFINITION FILE (m9.py)                       #
+#                     cable_delay + circular polarization                      #
 # =============================================================================#
 import bilby
 import numpy as np
@@ -17,7 +18,9 @@ C = c.value
 # -----------------------------------------------------------------------------#
 def model(pDict, lamSqArr_m2):
     """
-    Faraday thin source + differential X/Y phase (cable delay)
+    Faraday thin source + differential X/Y phase (cable delay) + circular polarization
+
+    Was named "cable_delay+circular" in the previous pipeline 
 
     Linear polarization:
         p * exp[ 2i (psi0 + RM lambda^2) ]
@@ -40,8 +43,7 @@ def model(pDict, lamSqArr_m2):
     qArr = quArr.real
     uArr = quArr.imag
 
-    # No intrinsic circular polarization
-    vArr = np.zeros_like(lamSqArr_m2)
+    vArr = pDict['fracPol_V'] * np.ones_like(lamSqArr_m2)
 
     # Differential phase between X/Y feeds
     phase = 2 * np.pi * freqArr * pDict["lag_s"] + np.radians(pDict["lag_phi"])
@@ -84,6 +86,10 @@ prior_config = {
         name="lag_phi", latex_label=r"lag$_\phi$ (deg)",
         boundary="periodic",
     ),
+    "fracPol_V": dict(
+        minimum=-1.0, maximum=1.0,
+        name='fracPol_V', latex_label=r"$p_V$",
+    ),
 }
 
 def get_priors(bounds=None):
@@ -104,5 +110,3 @@ def get_priors(bounds=None):
     return priors 
 
 priors = get_priors()
-
-
